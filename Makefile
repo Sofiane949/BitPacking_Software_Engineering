@@ -31,6 +31,10 @@ compile: $(SOURCES)
 run: compile
 	$(JVM) -cp $(CP) $(MAIN_CLASS)
 
+benchmark: compile
+	@echo "--- Lancement du Benchmark ---"
+	$(JVM) -cp $(CP) BenchmarkRunner
+
 test: compile-tests
 	@echo "--- Lancement des tests JUnit ---"
 	@if [ ! -f $(JUNIT_JAR) ]; then \

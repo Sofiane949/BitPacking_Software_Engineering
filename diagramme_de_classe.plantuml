@@ -5,6 +5,7 @@ interface BitPacker {
     void compress(int[] input)
     void decompress(int[] output)
     int get(int i)
+    int[] getCompressedData()
 }
 
 class BitPackerOverlap implements BitPacker {
@@ -16,6 +17,7 @@ class BitPackerOverlap implements BitPacker {
     void decompress(int[] output)
     int get(int i)
     void maxK(int[] tab)
+    int[] getCompressedData()
 }
 
 class BitPackerNoOverlap implements BitPacker {
@@ -28,6 +30,7 @@ class BitPackerNoOverlap implements BitPacker {
     void decompress(int[] output)
     int get(int i)
     void maxK(int[] tab)
+    int[] getCompressedData()
 }
 
 class BitPackerOverflow implements BitPacker {
@@ -42,9 +45,26 @@ class BitPackerOverflow implements BitPacker {
     void decompress(int[] output)
     int get(int i)
     int getKForValue(int val)
+    int[] getCompressedData()
 }
 
 class BitPackerFactory {
+    BitPacker create(CompressionType type)
+}
+
+class BenchmarkRunner {
+    int ARRAY_SIZE
+    int WARMUP_RUNS
+    int TIMING_RUNS
+    void main(String[] args)
+    void runAllTests(int[] data)
+    void runTest(BitPackerFactory.CompressionType type, int[] data)
+    int[] generateRandomData(int size, int maxValue)
+    int[] generateOverflowData(int size, int normalMax, int outlierMax, double outlierChance)
+}
+
+class Main {
+    void main(String[] args)
 }
 
 BitPackerOverflow -- "1" BitPacker
