@@ -1,0 +1,301 @@
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+
+\geometry{
+    a4paper,
+    total={170mm,257mm},
+    left=20mm,
+    top=20mm,
+}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={Rapport de Projet SE 2025 - Compression d'Entiers},
+    pdfauthor={[Votre Nom]}
+}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.98,0.98,0.98}
+
+\lstdefinestyle{javastyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+    language=Java
+}
+\lstset{style=javastyle}
+
+\title{
+    Rapport de Projet de Software Engineering 2025 \\
+    \vspace{1cm}
+    \textbf{Compression d'Entiers pour la Transmission de Données}
+}
+\author{[Khourta Sofiane]}
+\date{}
+
+% ==============================================================================
+% --- DÉBUT DU DOCUMENT ---
+% ==============================================================================
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty} 
+
+\newpage
+\tableofcontents
+\newpage
+
+% ==============================================================================
+\section{Introduction}
+\label{sec:intro}
+% ==============================================================================
+
+La transmission efficace de grands volumes de données, tels que les tableaux d'entiers, est un enjeu majeur sur Internet. L'objectif de ce projet était de compresser ces tableaux pour réduire le nombre d'entiers à transmettre, et donc en accélérer le transfert.
+
+L'idée principale est d'utiliser le \textbf{Bit Packing} : au lieu de stocker chaque entier sur 32 bits, seul le nombre de bits $k$ nécessaire pour le plus grand élément du tableau est utilisé.
+
+La contrainte fondamentale était de **ne pas perdre l'accès direct** aux éléments. Même après compression, le $i$-ème entier de l'array original doit pouvoir être retrouvé sans avoir à décompresser l'intégralité du tableau.
+
+Ce rapport présente les trois solutions implémentées (NoOverlap, Overlap, et Overflow), l'architecture logicielle qui les lie, et une analyse des performances basée sur des benchmarks concrets pour déterminer quand la compression est rentable.
+
+\vspace{0.5cm}
+\textbf{Lien vers le dépôt GitHub :} \href{[https://github.com/Sofiane949/BitPacking_Software_Engineering]}{[https://github.com/Sofiane949/BitPacking_Software_Engineering]}
+
+% ==============================================================================
+\section{Architecture de la Solution}
+\label{sec:architecture}
+% ==============================================================================
+
+Pour garantir la maintenabilité et la modularité du projet, une architecture basée sur une interface et une Factory a été choisie.
+
+\subsection{Interface \texttt{BitPacker}}
+
+Pour traiter les différentes méthodes de compression de façon uniforme, une interface \texttt{BitPacker} a été définie. Elle garantit que chaque classe de compression implémente les mêmes méthodes de base.
+
+\begin{lstlisting}[caption={Interface BitPacker.java}]
+public interface BitPacker {
+    void compress(int[] input);
+    void decompress(int[] output);
+    int get(int i);
+    int[] getCompressedData();
+}
+\end{lstlisting}
+
+\subsection{Usine de Création (\texttt{BitPackerFactory})}
+
+Conformément au sujet, une "Factory" gère la création des objets compresseurs. Le programme principal n'a qu'à demander un type de compression (via une \texttt{enum}), et la Factory lui fournit le bon objet, sans que le \texttt{Main} ait besoin de connaître les détails.
+
+\begin{lstlisting}[caption={Extrait de BitPackerFactory.java}]
+public class BitPackerFactory {
+
+    public enum CompressionType {
+        NO_OVERLAP,
+        WITH_OVERLAP,
+        OVERFLOW_NO_OVERLAP,
+        OVERFLOW_WITH_OVERLAP
+    }
+
+    public static BitPacker create(CompressionType type) {
+        switch (type) {
+            case NO_OVERLAP:
+                return new BitPackerNoOverlap();
+            // ... etc.
+        }
+    }
+}
+\end{lstlisting}
+
+% ==============================================================================
+\section{Implémentation des Méthodes de Compression}
+\label{sec:implementations}
+% ==============================================================================
+
+Trois logiques de compression distinctes ont été implémentées.
+
+% --- SOUS-SECTION 3.1 ---
+\subsection{\texttt{BitPackerNoOverlap}}
+
+C'est la version la plus simple. Elle n'autorise pas qu'un entier compressé soit écrit "à cheval" sur deux entiers de 32 bits.
+
+\paragraph{Logique}
+Le $k$ (bits max) est calculé, ainsi que le nombre d'entiers que l'on peut stocker dans un \texttt{int} de 32 bits ($nPerInt = \lfloor 32 / k \rfloor$). Chaque \texttt{int} de sortie est ensuite rempli avec $nPerInt$ entiers d'entrée, en utilisant des décalages de bits (`<<`).
+
+L'accès \texttt{get(i)} est très rapide : il suffit de trouver l'index ($i / nPerInt$) et la position ($i \ \% \ nPerInt$), puis d'utiliser un décalage (`>>`) et un masque (`\&`) pour isoler la valeur.
+
+\paragraph{Inconvénient}
+Cette méthode gaspille de l'espace. Si $k=9$, on ne peut stocker que 3 entiers ($3 \times 9 = 27$ bits), et $32 - 27 = 5$ bits sont perdus sur chaque \texttt{int} du tableau compressé.
+
+% --- SOUS-SECTION 3.2 ---
+\subsection{\texttt{BitPackerWithOverlap}}
+
+Cette version est la plus efficace en termes d'espace. Elle traite le tableau compressé comme un seul et long flux de bits. Un entier peut commencer sur les derniers bits d'un \texttt{int} et se terminer sur les premiers bits du suivant.
+
+\paragraph{Logique}
+On ne raisonne plus en $nPerInt$. Une position binaire globale $bitPos = i \times k$ est suivie. L'écriture et la lecture impliquent de calculer un $index$ dans le tableau et un $shift$ (décalage) à l'intérieur de cet $index$.
+
+Si l'entier déborde ($shift + k > 32$), la première partie doit être écrite dans $compressed[index]$ et la seconde (les bits de poids fort) dans $compressed[index + 1]$.
+
+\paragraph{Point technique (Java)}
+Une attention particulière a été portée à deux pièges en Java lors des manipulations de bits :
+1.  **Dépassement de capacité :** $i \times k$ peut dépasser la limite d'un \texttt{int}. Les calculs de position (comme $bitPos$) doivent donc être faits en \texttt{long}.
+2.  **Extension de signe :** Si un \texttt{int} compressé a un `1` comme premier bit, il est vu comme négatif. Un décalage (`>>`) propagerait des `1`. Le décalage non-signé (`>>>`) et un masque `\& 0xFFFFFFFFL` ont dû être utilisés pour forcer Java à traiter l'entier comme s'il était non-signé.
+
+% --- SOUS-SECTION 3.3 ---
+\subsection{\texttt{BitPackerOverflow}}
+
+Cette méthode répond au problème du gaspillage : si un seul "gros" nombre force $k=30$, mais que 99\% des autres nombres sont petits ($k=3$), on gaspille énormément.
+
+\paragraph{Choix de conception}
+Plutôt que de ré-implémenter la logique, le principe de **Composition** a été utilisé. Cette classe "enveloppe" un autre compresseur (par exemple, \texttt{BitPackerOverlap}) et lui sert de "traducteur".
+
+\paragraph{Logique de compression (3 passes)}
+1.  **Analyse :** Le $k$ de chaque nombre est calculé. Un seuil $k_{normal}$ est choisi (ici, la médiane des $k$).
+2.  **Comptage :** Les valeurs "hors normes" (outliers) sont comptées et stockées dans un tableau séparé $compressedOverflow[]$. On calcule $k_{index}$, le nombre de bits pour stocker l'index de ce tableau.
+3.  **Traduction :** Un nouveau tableau "à compresser" est créé. Il est rempli avec des valeurs "packées" de $k_{packed} = 1 + \max(k_{normal}, k_{index})$ bits.
+    \begin{itemize}
+        \item Si la valeur est normale : on écrit \texttt{0-valeur}.
+        \item Si la valeur est un outlier : on écrit \texttt{1-index}.
+    \end{itemize}
+4.  Ce nouveau tableau "traduit" est donné au compresseur interne (\texttt{BitPackerOverlap}) qui le compresse.
+
+\paragraph{Logique d'accès (\texttt{get(i)})}
+L'accès est simple : on demande la valeur packée $v$ au compresseur interne. On regarde le premier bit (le drapeau). Si c'est 0, on retourne le reste de $v$. Si c'est 1, on utilise le reste de $v$ comme index pour aller chercher la vraie valeur dans $compressedOverflow[]$.
+
+% ==============================================================================
+\section{Benchmarks et Analyse de Performance}
+\label{sec:benchmarks}
+% ==============================================================================
+
+\subsection{Protocole de Mesure}
+Pour mesurer les performances, une classe \texttt{BenchmarkRunner} a été utilisée. Le protocole est le suivant :
+1.  **Génération de Données :** Création de grands tableaux (1 million d'entiers) avec différents profils.
+2.  **Chauffe (Warm-up) :** Les fonctions sont exécutées 20 fois "à vide" avant de mesurer. C'est vital pour que la JVM (Java) ait le temps d'optimiser le code (compilation JIT).
+3.  **Mesure :** \texttt{System.nanoTime()} est utilisé pour une mesure précise, répétée 50 fois.
+4.  **Moyenne :** Le temps affiché est la moyenne de ces 50 exécutions.
+
+\subsection{Scénarios de Test}
+\begin{itemize}
+    \item \textbf{CAS 1 (Petites Données) :} Entiers $\le 255$ (k=8).
+    \item \textbf{CAS 2 (Moyennes Données) :} Entiers $\le 1 000 000$ (k=20).
+    \item \textbf{CAS 3 (Overflow) :} 99\% de petites données, 1\% de très grandes données.
+\end{itemize}
+
+\subsection{Résultats des Benchmarks}
+Voici les résultats obtenus sur un tableau de 1 000 000 d'entiers. La taille est estimée en nombre d'entiers de 32 bits.
+
+\begin{table}[h!]
+\centering
+\caption{Temps d'exécution (1 million d'entiers) et Taille de sortie (estimée)}
+\label{tab:results}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+\textbf{Scénario} & \textbf{Compresseur} & \textbf{Taille (est.)} & \textbf{Tps Compress} & \textbf{Tps Decompress} & \textbf{Tps Get(i)} \\ \midrule
+\textbf{Cas 1 (Petites)} & Original & 1 000 000 & 0 ms & 0 ms & - \\
+(k=8) & NoOverlap & 250 000 & 11 ms & 2 ms & 81 ns \\
+ & Overlap & 250 000 & 13 ms & 1 ms & 127 ns \\
+ & Overflow & 250 000 & 34 ms & 6 ms & 150 ns \\ \midrule
+\textbf{Cas 2 (Moyennes)} & Original & 1 000 000 & 0 ms & 0 ms & - \\
+(k=20) & NoOverlap & 1 000 000 & 17 ms & 2 ms & 32 ns \\
+ & Overlap & 625 000 & 18 ms & 2 ms & 155 ns \\
+ & Overflow & 1 000 000 & 100 ms & 6 ms & 152 ns \\ \midrule
+\textbf{Cas 3 (Overflow)} & Original & 1 000 000 & 0 ms & 0 ms & - \\
+(99\% k=8, 1\% k=30) & NoOverlap & 1 000 000 & 15 ms & 2 ms & 32 ns \\
+ & Overlap & 937 500 & 14 ms & 2 ms & 32 ns \\
+ & \textbf{Overflow} & \textbf{478 000} & 34 ms & 6 ms & 36 ns \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Analyse des résultats}
+\begin{itemize}
+    \item \textbf{Temps CPU :} La méthode \texttt{Overflow} est toujours la plus lente à compresser (34-100ms) à cause de ses multiples passes d'analyse. Les méthodes \texttt{Overlap} et \texttt{NoOverlap} sont très rapides (11-18ms).
+    \item \textbf{Cas 1 et 2 :} Dans les cas où les données sont "uniformes" (petites ou moyennes), \texttt{Overflow} est la moins bonne solution. Elle est lente et ne compresse pas mieux. Dans le Cas 2, \texttt{Overlap} est clairement le meilleur (taille de 625k).
+    \item \textbf{Cas 3 :} C'est le cas crucial. Les méthodes simples (\texttt{NoOverlap}, \texttt{Overlap}) sont forcées d'utiliser un $k=30$ pour tout le monde, à cause du 1\% de "grosses" valeurs. Leur compression est donc très mauvaise (Taille $\approx$ 937k-1M).
+    C'est là que \texttt{Overflow} brille : en payant un coût CPU (34ms), il atteint une \textbf{taille de sortie estimée à 478k entiers}, écrasant les autres méthodes.
+\end{itemize}
+
+% ==============================================================================
+\section{Analyse de Rentabilité de la Transmission}
+\label{sec:rentabilite}
+% ==============================================================================
+
+Le sujet demande quand la compression devient rentable. Analysons les temps. Soit $B$ la bande passante du réseau (en bits/sec) et $t$ la latence (en sec).
+
+\paragraph{Temps sans compression}
+$$ T_{original} = \frac{\text{Taille}_{orig}}{B} + t $$
+
+\paragraph{Temps avec compression}
+$$ T_{compresse} = T_{cpu} + \frac{\text{Taille}_{comp}}{B} + t $$
+(où $T_{cpu} = T_{compression} + T_{decompression}$)
+
+\paragraph{Calcul du seuil de rentabilité}
+La compression est rentable si $T_{compresse} < T_{original}$.
+$$ T_{cpu} + \frac{\text{Taille}_{comp}}{B} + t < \frac{\text{Taille}_{orig}}{B} + t $$
+Il est à noter que la latence $t$ s'annule des deux côtés. \textbf{La latence n'a donc aucun impact sur la rentabilité de la compression.} Le facteur déterminant est la bande passante $B$.
+
+L'inéquation devient :
+$$ T_{cpu} < \frac{\text{Taille}_{orig} - \text{Taille}_{comp}}{B} $$
+$$ B < \frac{\text{Taille}_{orig} - \text{Taille}_{comp}}{T_{cpu}} $$
+
+Ceci définit le \textbf{seuil de bande passante} $B_{seuil}$ en dessous duquel la compression est rentable.
+$$ B_{seuil} = \frac{\text{Gain de Taille (bits)}}{Temps CPU (sec)} $$
+
+\paragraph{Exemple concret (Cas 3 : Overflow vs Overlap)}
+Dans le Cas 3, un compresseur "simple" (Overlap) est rapide mais produit un gros fichier, tandis que le compresseur "intelligent" (Overflow) est lent mais produit un petit fichier. Comparons-les :
+\begin{itemize}
+    \item $\text{Taille}_{Overlap} \approx 937 500 \times 32 = 30 000 000$ bits
+    \item $\text{Taille}_{Overflow} \approx 478 000 \times 32 = 15 296 000$ bits
+    \item $\text{Gain de Taille} = 14 704 000$ bits
+    \item $T_{cpu (Overlap)} = 14\text{ms} + 2\text{ms} = 16\text{ms}$
+    \item $T_{cpu (Overflow)} = 34\text{ms} + 6\text{ms} = 40\text{ms}$
+    \item $\text{Coût CPU supplémentaire} = 40\text{ms} - 16\text{ms} = 24\text{ms} = 0.024\text{s}$
+\end{itemize}
+
+Le coût CPU de 24ms est "rentable" si le gain de temps sur le réseau est supérieur.
+$$ B_{seuil} = \frac{\text{Gain de Taille (bits)}}{\text{Coût CPU (sec)}} = \frac{14 704 000 \text{ bits}}{0.024 \text{ s}} $$
+$$ B_{seuil} \approx 612 666 666 \text{ bits/s} \approx 612 \text{ Mbits/s} $$
+
+\textbf{Conclusion :} Dans ce scénario, si la bande passante est inférieure à $\approx 612$ Mbits/s, il est plus rapide d'utiliser la méthode \texttt{Overflow}, même si elle prend plus de temps de calcul.
+
+% ==============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ==============================================================================
+
+Ce projet a été l'occasion d'implémenter un système de compression d'entiers modulaire et performant. Trois stratégies distinctes (NoOverlap, Overlap, Overflow) ont pu être codées, en respectant une interface commune et en utilisant une usine pour leur instanciation. Un protocole de benchmark a également été mis en place pour les évaluer.
+
+L'analyse des performances a bien montré qu'il n'y a pas de "meilleur" compresseur universel. La méthode la plus rapide (Overlap) n'est pas toujours celle qui compresse le mieux.
+
+Finalement, la solution \texttt{BitPackerOverflow} (utilisant \texttt{BitPackerOverlap} en interne) s'est révélée être la plus "intelligente" et la plus robuste. Elle est la seule capable de s'adapter à des données non-uniformes (le "Cas 3"), qui est un scénario très probable dans des cas d'utilisation réels. Son coût CPU supplémentaire est, comme calculé précédemment, largement compensé par le gain en taille de transmission sur la plupart des réseaux actuels.
+
+\end{document}
+% ==============================================================================
+% --- FIN DU DOCUMENT ---
+% ==============================================================================
