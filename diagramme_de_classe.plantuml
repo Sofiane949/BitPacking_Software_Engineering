@@ -1,0 +1,23 @@
+@startuml
+package BitPacker {
+
+interface BitPacker {
+    void compress(int[] input)
+    void decompress(int[] output)
+    int get(int i)
+}
+
+class BitPackerOverlap implements BitPacker {
+    void compress(int[] input)
+    void decompress(int[] output)
+    int get(int i)
+}
+
+class BitPackerNoOverlap implements BitPacker {
+    void compress(int[] input)
+    void decompress(int[] output)
+    int get(int i)
+
+}
+}
+@enduml
