@@ -11,6 +11,7 @@ class BitPackerOverlap implements BitPacker {
     int k
     int originalLength
     int[] compressed
+    BitPackerOverlap()
     void compress(int[] input)
     void decompress(int[] output)
     int get(int i)
@@ -22,13 +23,31 @@ class BitPackerNoOverlap implements BitPacker {
     int nPerInt
     int originalLength
     int[] compressed
+    BitPackerNoOverlap()
     void compress(int[] input)
     void decompress(int[] output)
     int get(int i)
     void maxK(int[] tab)
 }
 
+class BitPackerOverflow implements BitPacker {
+    int kNormal
+    int kOverflowIndex
+    int payloadWidth
+    int packedK
+    int originalLength
+    int[] compressedOverflow
+    BitPackerOverflow(BitPacker internalPacker)
+    void compress(int[] input)
+    void decompress(int[] output)
+    int get(int i)
+    int getKForValue(int val)
+}
+
 class BitPackerFactory {
 }
+
+BitPackerOverflow -- "1" BitPacker
+
 }
 @enduml
