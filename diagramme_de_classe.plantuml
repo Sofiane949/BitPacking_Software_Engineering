@@ -14,10 +14,17 @@ class BitPackerOverlap implements BitPacker {
 }
 
 class BitPackerNoOverlap implements BitPacker {
+    int k
+    int nPerInt
+    int originalLength
+    int[] compressed
     void compress(int[] input)
     void decompress(int[] output)
     int get(int i)
+    void maxK(int[] tab)
+}
 
+class BitPackerFactory {
 }
 }
 @enduml
