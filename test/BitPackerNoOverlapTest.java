@@ -23,14 +23,22 @@ class BitPackerNoOverlapTest {
 
     @org.junit.jupiter.api.Test
     void decompress() {
+        int[] input = {15,14,255,21,3012};
+        BitPackerNoOverlap bp = new BitPackerNoOverlap();
+        bp.compress(input);
+        int[] output = new int[5];
+        bp.decompress(output);
+        for (int i = 0; i < 5; i++) {
+            assertEquals(output[0], input[0]);
+        }
     }
 
     @org.junit.jupiter.api.Test
     void get() {
-        int[] a = {15,14,255,21};
+        int[] a = {15,14,255,21,3012};
         BitPackerNoOverlap bp = new BitPackerNoOverlap();
         bp.compress(a);
-        assert (bp.get(0) == 15 && bp.get(1) == 14 && bp.get(2) == 255 && bp.get(3) == 21);
+        assert (bp.get(0) == 15 && bp.get(1) == 14 && bp.get(2) == 255 && bp.get(3) == 21 && bp.get(4) == 3012);
     }
 
     @Test

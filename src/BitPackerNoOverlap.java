@@ -25,29 +25,31 @@ public class BitPackerNoOverlap implements BitPacker {
         int compressedLength = (int) Math.ceil((double) input.length / nPerInt);
         compressed = new int[compressedLength];
         int i = 0;
-        int j = 0;
+        int bitPos = 0;
         for (int a : input) {
-            if (j + k > 32) {
+            if (bitPos + k > 32) {
                 i++;
-                j = 0;
+                bitPos = 0;
             }
 
-            compressed[i] = compressed[i] | (a << j);
-            j += k;
+            compressed[i] = compressed[i] | (a << bitPos);
+            bitPos += k;
         }
     }
 
     @Override
     public void decompress(int[] output) {
-
+        for (int i = 0; i < originalLength; i++) {
+            output[i] = get(i);
+        }
     }
 
     @Override
     public int get(int i) {
         int index = i / nPerInt;
         int posBits = (i % nPerInt) * k;
-        int r = compressed[index] >> posBits;
         int mask = (1 << k) - 1;
+        int r = compressed[index] >> posBits;
         r = r & mask;
         return r;
     }
