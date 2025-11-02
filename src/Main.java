@@ -54,6 +54,13 @@ public class Main {
         System.out.println("\n... Compression en cours ...");
         packer.compress(originalData);
 
+        int compressedSize = packer.getCompressedData().length;
+
+        if (packer instanceof BitPackerOverflow) {
+            compressedSize += ((BitPackerOverflow) packer).getCompressedOverflow().length;
+        }
+        System.out.println("Taille compressée: " + compressedSize + " entiers");
+
         // Test get
         System.out.println("\n--- Test: Accès Direct get(i) ---");
         int index = Math.min(3, originalData.length - 1);

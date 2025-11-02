@@ -138,6 +138,10 @@ public class BitPackerOverflow implements BitPacker {
         }
     }
 
+    public int[] getCompressedData() {
+        return compressedOverflow;
+    }
+
     public int getKForValue(int val) {
         if (val < 0) return 32;
         if (val == 0) return 1;

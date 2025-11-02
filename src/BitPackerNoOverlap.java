@@ -72,6 +72,10 @@ public class BitPackerNoOverlap implements BitPacker {
         }
     }
 
+    public int[] getCompressedData() {
+        return compressed;
+    }
+
     public int[] getCompressed() {
         return compressed;
     }
