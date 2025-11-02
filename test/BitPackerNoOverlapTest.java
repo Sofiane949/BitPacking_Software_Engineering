@@ -14,7 +14,6 @@ class BitPackerNoOverlapTest {
         assertEquals (2, bp.getK());
         assertEquals(1, bp.getCompressed().length);
         int[] b = {15,14,255,21,1};
-        BitPackerNoOverlap bp1 = new BitPackerNoOverlap();
         bp.compress(b);
         assertEquals (8, bp.getK());
         assertEquals (2, bp.getCompressed().length);

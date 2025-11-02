@@ -39,6 +39,10 @@ public class BitPackerNoOverlap implements BitPacker {
 
     @Override
     public void decompress(int[] output) {
+        if (output.length != originalLength) {
+            throw new IllegalArgumentException("Le tableau de sortie n'a pas la bonne taille. Attendu: " + originalLength);
+        }
+
         for (int i = 0; i < originalLength; i++) {
             output[i] = get(i);
         }
@@ -46,6 +50,10 @@ public class BitPackerNoOverlap implements BitPacker {
 
     @Override
     public int get(int i) {
+        if (k == 32) {
+            return compressed[i];
+        }
+
         int index = i / nPerInt;
         int posBits = (i % nPerInt) * k;
         int mask = (1 << k) - 1;
